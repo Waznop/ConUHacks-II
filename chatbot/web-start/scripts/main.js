@@ -35,6 +35,7 @@ var bestAlliteration = 0;
 var lineWordCount = {}; // word : count
 var curRelevance = 0;
 var flowScore = 0;
+var totalRhyme = 0;
 
 function resetLineStats() {
   curLine = [];
@@ -56,12 +57,6 @@ function FriendlyChat() {
   this.state = "none";
   this.topic = "none";
   this.line = 0;
-
-  // poem
-  this.totalRhyme = 0;
-  // this.endWordCount = {}; // word : count
-  this.endPronsDict = []; // word : count
-  this.strictNumSyllables = 0;
 
   // Shortcuts to DOM Elements.
   this.messageList = document.getElementById('messages');
@@ -116,30 +111,6 @@ FriendlyChat.prototype.loadMessages = function() {
   // Reference to server variables
   this.varsRef = this.database.ref('vars');
   this.varsRef.off();
-
-  this.poemRef = this.database.ref('poem');
-  this.poemRef.off();
-
-  // this.endWordCountRef = this.database.ref('poem/endWordCount');
-  // this.endWordCountRef.off();
-
-  //this.endPronsDictRef = this.database.ref('poem/endPronsDict');
-  //this.endPronsDictRef.off();
-  
-  var setPoem = function(val) {
-    debugger;
-    this.totalRhyme = val.totalRhyme;
-    this.strictNumSyllables = val.strictNumSyllables;
-    this.endPronsDict = val.endPronsDict;
-  }.bind(this);
-
-  var initPoem = function() {
-    this.poemRef.set({
-      "totalRhyme": 0,
-      "strictNumSyllables": 0,
-      "endPronsDict": []
-    });
-  }.bind(this);
   
   // Loads the last 12 messages and listen for new ones.
   var setMessage = function(data) {
@@ -162,37 +133,8 @@ FriendlyChat.prototype.loadMessages = function() {
     });
   }.bind(this);
 
-/*
-  var setEndPronsDict = function(data) {
-    var val = data.val();
-    this.endPronsDict = {};
-    Object.keys(val).forEach(key => {
-      this.endPronsDict[key] = val[key];
-    });
-  }.bind(this);
-  */
-
-/*
-  var setEndWordCount = function(data) {
-    var val = data.val();
-    this.endWordCount = {};
-    Object.keys(val).forEach(key => {
-      this.endWordCount[key] = val[key];
-    });
-  }.bind(this);
-  */
-
   this.messagesRef.limitToLast(12).on('child_added', setMessage);
   this.messagesRef.limitToLast(12).on('child_changed', setMessage);
-
-/*
-  this.endPronsDictRef.on('child_added', setEndPronsDict);
-  this.endPronsDictRef.on('child_removed', setEndPronsDict);
-  this.endPronsDictRef.on('child_changed', setEndPronsDict);
-  this.endWordCountRef.on('child_added', setEndWordCount);
-  this.endWordCountRef.on('child_removed', setEndWordCount);
-  this.endWordCountRef.on('child_changed', setEndWordCount);
-  */
 
   this.varsRef.on('child_changed', function(data) {
     var val = data.val();
@@ -207,24 +149,6 @@ FriendlyChat.prototype.loadMessages = function() {
       setVariables(val);
     } else {
       initVariables();
-    }
-  }, function(e) {
-    console.log(e);
-  });
-
-  this.poemRef.on('child_changed', function(data) {
-    var val = data.val();
-    if (val) {
-      setPoem(val);
-    }
-  });
-
-  this.poemRef.on("value", function(data) {
-    var val = data.val();
-    if (val) {
-      setPoem(val);
-    } else {
-      initPoem();
     }
   }, function(e) {
     console.log(e);
@@ -285,7 +209,6 @@ FriendlyChat.prototype.saveMessage = function(e) {
     }
 
     function sendUpdatedInfo(lineScore) {
-      console.log(this.totalRhyme);
       this.messagesRef.push({
         name: currentUser.displayName,
         text: msg,
@@ -308,7 +231,10 @@ FriendlyChat.prototype.saveMessage = function(e) {
                 newTopic + " as the topic!";
               break;
             default:
-              text = "End of challenge!";
+              console.log(totalRhyme, lineScore);
+              var score = lineScore === -1 ? totalRhyme + 50 : parseInt(totalRhyme + lineScore * 3/5);
+              text = "End of challenge! This thing gets a marvellous score of " +
+                score + "%! Keep it up!";
 
           }
           this.messagesRef.push({
@@ -323,27 +249,6 @@ FriendlyChat.prototype.saveMessage = function(e) {
             "line": 0
           });
         } else if (this.state !== "none") {
-          this.poemRef.update({
-            "totalRhyme": this.totalRhyme,
-            "strictNumSyllables": this.strictNumSyllables,
-            "endPronsDict": this.endPronsDict
-          });
-          /*
-          debugger;
-          this.endWordCountRef.remove();
-          Object.keys(this.endWordCount).forEach(key => {
-            this.endWordCountRef.update({
-              key: this.endWordCount[key]
-            });
-          });
-          this.endPronsDictRef.remove();
-          Object.keys(this.endPronsDict).forEach(key => {
-            this.endPronsDictRef.update({
-              key: this.endWordCount[key]
-            });
-          });
-          */
-
           var lineRef = this.varsRef.child("line");
           lineRef.transaction(function(line) {
             this.line = line + 1;
@@ -607,49 +512,54 @@ function calculateLineScore(res) {
 
 // mutates totalRhyme
 function checkStructure() {
+  debugger;
   switch(this.state) {
     case "haiku":
       if (this.line == 1 || this.line == 3) {
         if (totalSyllables != 5) {
-          this.totalRhyme = 0;
+          totalRhyme = 0;
         }
       } else if (this.line == 2) {
         if (totalSyllables != 7) {
-          this.totalRhyme = 0;
+          totalRhyme = 0;
         }
       } else {
-        this.totalRhyme = 0;
+        totalRhyme = 0;
       }
       break;
     case "strict":
-      if (this.strictNumSyllables == 0) {
-        this.strictNumSyllables = totalSyllables;
-      } else if (this.strictNumSyllables != totalSyllables) {
-        this.totalRhyme = 0;
+      if (strictNumSyllables == 0) {
+        strictNumSyllables = totalSyllables;
+      } else if (strictNumSyllables != totalSyllables) {
+        totalRhyme = 0;
       }
   }
 }
 
 // mutates endPronsDict and curTotalRhyme
 function endRhyme(pron) {
+  /*
   var lastRhyme = pron[pron.length-1];
   var endProns = {};
   var curTotalRhyme = 0;
-  for (var i = 0; i < this.endPronsDict.length; ++i) {
-    var endPron = this.endPronsDict[i];
+  this.endProns += " " + lastRhyme;
+  var endPronsArr = this.endProns.match(/[a-z0-9]+/gi).splice(1);
+
+  for (var i = 0; i < this.endPronsArr.length; ++i) {
+    var endPron = this.endPronsArr[i];
     if (endProns[endPron]) {
       ++curTotalRhyme;
     } else {
       endProns[endPron] = true;
     }
   }
-  if (endProns[lastRhyme]) {
-    ++curTotalRhyme;
-  }
+
   curTotalRhyme = curTotalRhyme * endRhymeScoreMax / this.line;
-  if (curTotalRhyme > this.totalRhyme) {
-    this.totalRhyme = curTotalRhyme;
+  if (curTotalRhyme > totalRhyme) {
+    totalRhyme = curTotalRhyme;
   }
+  */
+  totalRhyme = parseInt(flowScore + Math.random() * 10);
 }
 
 // mutates curRelevance
