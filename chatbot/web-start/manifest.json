@@ -1,0 +1,7 @@
+{
+  "name": "ChatBot",
+  "short_name": "ChatBot",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait"
+}
