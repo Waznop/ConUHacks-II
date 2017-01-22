@@ -12,7 +12,7 @@ var totalRhyme = 0;
 var topic = "";
 var endWordCount = {}; // word : count
 var endPronsDict = {}; // word : count
-var status = "Freestyle";
+var state = "freestyle";
 var lineNumber = 0;
 var strictNumSyllables = 0;
 
@@ -92,7 +92,7 @@ function calculateLineScore(res) {
 
 // mutates totalRhyme
 function checkStructure() {
-	switch(status) {
+	switch(state) {
 		case "haiku":
 			if (lineNumber == 1 || lineNumber == 3) {
 				if (totalSyllables != 5) {
